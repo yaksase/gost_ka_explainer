@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Методика аудита надёжности ЭА — как это работает</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,600;0,800;1,400&family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16202b;
+    --ink-soft:#41505f;
+    --ink-faint:#7c8a99;
+    --paper:#f2f1ec;
+    --panel:#ffffff;
+    --line:#dcdad2;
+    --line-strong:#c4c1b6;
+    --brick:#a32c1e;
+    --brick-d:#7e2014;
+    --steel:#23527c;
+    --steel-l:#eaf1f8;
+    --amber:#c98a12;
+    --shadow:0 1px 0 rgba(0,0,0,.04),0 14px 40px -22px rgba(22,32,43,.45);
+    /* maturity */
+    --m5:#1f8a5b; --m4:#5fa83c; --m3:#c98a12; --m2:#d9651f; --m1:#a32c1e;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Golos Text",-apple-system,Segoe UI,Roboto,sans-serif;
+    font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(rgba(22,32,43,.025) 1px, transparent 1px);
+    background-size:22px 22px;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+  h1,h2,h3{font-family:"Spectral",Georgia,serif; font-weight:800; line-height:1.12; letter-spacing:-.01em}
+  .mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+  a{color:var(--steel)}
+
+  /* ---------- masthead ---------- */
+  header{
+    background:
+      linear-gradient(180deg,#1a242f 0%, #131b24 100%);
+    color:#f2f1ec; padding:54px 0 48px; position:relative; overflow:hidden;
+    border-bottom:4px solid var(--brick);
+  }
+  header:before{
+    content:""; position:absolute; inset:0;
+    background-image:repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 64px);
+    pointer-events:none;
+  }
+  .eyebrow{
+    font-family:"JetBrains Mono",monospace; font-size:12px; letter-spacing:.22em;
+    text-transform:uppercase; color:#d8a59d; margin:0 0 18px;
+  }
+  header h1{font-size:clamp(30px,5vw,52px); margin:0; color:#fff; max-width:18ch}
+  header .lead{margin:18px 0 0; max-width:62ch; color:#c6ccd2; font-size:18px}
+  .shifr{
+    margin-top:26px; display:inline-flex; gap:18px; flex-wrap:wrap;
+    font-family:"JetBrains Mono",monospace; font-size:12.5px; color:#9fb0bf;
+  }
+  .shifr b{color:#e7c4bd; font-weight:500}
+
+  /* ---------- section scaffolding ---------- */
+  section{padding:64px 0; border-bottom:1px solid var(--line)}
+  .kicker{
+    font-family:"JetBrains Mono",monospace; font-size:12px; letter-spacing:.18em;
+    text-transform:uppercase; color:var(--brick); margin:0 0 12px; font-weight:700;
+  }
+  section h2{font-size:clamp(24px,3.4vw,34px); margin:0 0 8px}
+  section .sub{color:var(--ink-soft); max-width:64ch; margin:0 0 34px; font-size:17px}
+
+  /* ---------- core idea ---------- */
+  .idea{
+    background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--brick);
+    border-radius:4px; padding:30px 34px; box-shadow:var(--shadow);
+  }
+  .idea p{margin:0 0 14px; font-size:18px}
+  .idea p:last-child{margin-bottom:0}
+  .idea b{color:var(--brick-d)}
+  .formula-inline{
+    font-family:"JetBrains Mono",monospace; background:var(--steel-l); color:var(--steel);
+    padding:2px 8px; border-radius:4px; font-size:.92em; white-space:nowrap;
+  }
+
+  /* ---------- pipeline ---------- */
+  .pipe{display:flex; flex-direction:column; gap:0}
+  .pstep{
+    display:grid; grid-template-columns:54px 1fr; gap:20px; align-items:start;
+    position:relative; padding-bottom:26px;
+  }
+  .pstep:last-child{padding-bottom:0}
+  .pstep:before{
+    content:""; position:absolute; left:26px; top:46px; bottom:-6px; width:2px;
+    background:var(--line-strong);
+  }
+  .pstep:last-child:before{display:none}
+  .pnum{
+    width:52px; height:52px; border-radius:50%; flex:none; z-index:1;
+    background:var(--panel); border:2px solid var(--ink); color:var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    font-family:"JetBrains Mono",monospace; font-weight:700; font-size:18px;
+  }
+  .pstep.accent .pnum{background:var(--brick); border-color:var(--brick); color:#fff}
+  .pstep.out .pnum{background:var(--steel); border-color:var(--steel); color:#fff}
+  .pbody{background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:16px 20px; box-shadow:var(--shadow)}
+  .pbody h3{font-family:"Golos Text",sans-serif; font-weight:700; font-size:17px; margin:0 0 4px}
+  .pbody p{margin:0; color:var(--ink-soft); font-size:14.5px}
+  .pbody .tag{
+    display:inline-block; margin-top:8px; font-family:"JetBrains Mono",monospace; font-size:12px;
+    color:var(--steel); background:var(--steel-l); padding:3px 8px; border-radius:4px;
+  }
+
+  /* ---------- categories ---------- */
+  .cats{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
+  .cat{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px 20px;
+    box-shadow:var(--shadow); position:relative; overflow:hidden;
+  }
+  .cat:before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--bar,#999)}
+  .cbadge{
+    width:38px; height:38px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    font-family:"JetBrains Mono",monospace; font-weight:700; font-size:20px; color:#fff; background:var(--bar,#999);
+    margin-bottom:12px;
+  }
+  .cat h3{font-family:"Golos Text",sans-serif; font-weight:700; font-size:16px; margin:0 0 6px; line-height:1.25}
+  .cat p{margin:0; font-size:13.5px; color:var(--ink-soft)}
+
+  /* ---------- L scale ---------- */
+  .lscale{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+  .lcard{
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px; box-shadow:var(--shadow);
+    text-align:center; position:relative;
+  }
+  .lcard .lv{font-family:"JetBrains Mono",monospace; font-weight:700; font-size:13px; color:var(--brick); letter-spacing:.1em}
+  .lcard .lg{font-family:"JetBrains Mono",monospace; font-size:30px; font-weight:700; margin:6px 0; color:var(--ink)}
+  .lcard p{margin:0; font-size:13px; color:var(--ink-soft)}
+  .ldot{height:6px; border-radius:3px; margin-top:14px}
+
+  /* ---------- calculator ---------- */
+  .calc{background:linear-gradient(180deg,#1a242f,#141c25); color:#e9ecef; border-radius:14px; padding:30px; box-shadow:0 30px 70px -34px rgba(0,0,0,.6)}
+  .calc-grid{display:grid; grid-template-columns:1.15fr .85fr; gap:30px}
+  .calc h3{font-family:"Spectral",serif; color:#fff; font-size:20px; margin:0 0 4px}
+  .calc .hint{color:#9aa7b3; font-size:13.5px; margin:0 0 20px}
+
+  .sliders{display:flex; flex-direction:column; gap:13px}
+  .srow{display:grid; grid-template-columns:30px 1fr 92px; gap:12px; align-items:center}
+  .schip{width:30px; height:30px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-family:"JetBrains Mono",monospace; font-weight:700; font-size:15px; color:#fff}
+  .strack{position:relative}
+  .sname{font-size:12px; color:#aeb9c4; margin-bottom:5px; line-height:1.2}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:6px;
+    background:#33414f; outline:none; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+    background:#fff; border:3px solid var(--chip,#c98a12); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--chip,#c98a12);cursor:pointer}
+  .sval{text-align:right; font-family:"JetBrains Mono",monospace; font-size:13px; color:#dfe5ea}
+  .sval .pi{display:block; font-size:11px; color:#8b97a3; margin-top:2px}
+
+  /* readout panel */
+  .readout{display:flex; flex-direction:column; gap:18px}
+  .ka-box{background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09); border-radius:12px; padding:22px; text-align:center}
+  .ka-box .lbl{font-family:"JetBrains Mono",monospace; font-size:12px; letter-spacing:.18em; color:#9aa7b3; text-transform:uppercase}
+  .ka-val{font-family:"JetBrains Mono",monospace; font-weight:700; font-size:58px; line-height:1; margin:6px 0 2px; color:#fff}
+  .ka-form{font-family:"JetBrains Mono",monospace; font-size:12px; color:#8b97a3}
+
+  .tabs{display:flex; gap:6px; margin-bottom:4px}
+  .tab{
+    flex:1; text-align:center; padding:9px 6px; border-radius:8px; cursor:pointer; user-select:none;
+    background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+    font-size:12.5px; color:#c2ccd5; transition:.15s;
+  }
+  .tab .t2{display:block; font-family:"JetBrains Mono",monospace; font-size:11px; color:#8b97a3; margin-top:2px}
+  .tab.active{background:var(--brick); border-color:var(--brick); color:#fff}
+  .tab.active .t2{color:#f1c8c2}
+
+  .extra{display:none; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07); border-radius:10px; padding:14px 16px; margin-top:4px}
+  .extra.show{display:block}
+  .extra .er{display:grid; grid-template-columns:1fr 64px; gap:10px; align-items:center; margin:8px 0}
+  .extra .er:first-child{margin-top:0}
+  .extra label{font-size:12.5px; color:#aeb9c4}
+  .extra label b{color:#fff; font-family:"JetBrains Mono",monospace}
+  .extra input[type=number]{
+    width:64px; background:#0f161d; border:1px solid #33414f; color:#fff; border-radius:6px;
+    padding:5px 7px; font-family:"JetBrains Mono",monospace; font-size:13px; text-align:center;
+  }
+
+  /* maturity gauge */
+  .gauge{margin-top:4px}
+  .gauge-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px}
+  .gauge-label .uz{font-family:"Spectral",serif; font-weight:800; font-size:19px}
+  .gauge-label .uztxt{font-size:13px; color:#aeb9c4}
+  .gbar{position:relative; height:34px; border-radius:8px; overflow:hidden; display:flex; border:1px solid rgba(255,255,255,.1)}
+  .gseg{display:flex; align-items:center; justify-content:center; font-family:"JetBrains Mono",monospace; font-size:11px; color:rgba(255,255,255,.85); position:relative}
+  .gptr{position:absolute; top:-6px; bottom:-6px; width:3px; background:#fff; box-shadow:0 0 0 2px rgba(0,0,0,.35); transition:left .18s ease; z-index:3}
+  .gptr:after{content:""; position:absolute; top:-7px; left:50%; transform:translateX(-50%); border:6px solid transparent; border-top-color:#fff}
+  .gscale{display:flex; justify-content:space-between; font-family:"JetBrains Mono",monospace; font-size:10.5px; color:#7e8a96; margin-top:6px}
+
+  .params{margin-top:22px; border-top:1px solid rgba(255,255,255,.08); padding-top:16px}
+  .params summary{cursor:pointer; font-size:13px; color:#aeb9c4; font-family:"JetBrains Mono",monospace; letter-spacing:.05em}
+  .params summary::marker{color:var(--amber)}
+  .params .prow{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:14px}
+  .params .pcell label{display:block; font-size:11.5px; color:#9aa7b3; margin-bottom:4px}
+  .params .pcell input{width:100%; background:#0f161d; border:1px solid #33414f; color:#fff; border-radius:6px; padding:6px; font-family:"JetBrains Mono",monospace; font-size:13px; text-align:center}
+  .params .note{font-size:11.5px; color:#c98a12; margin-top:12px; line-height:1.5}
+
+  /* ---------- reliability ---------- */
+  .rel-grid{display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start}
+  .rel-eq{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:24px; box-shadow:var(--shadow)}
+  .rel-eq .big{
+    font-family:"JetBrains Mono",monospace; font-size:20px; text-align:center; color:var(--ink);
+    background:var(--steel-l); border-radius:8px; padding:16px; margin-bottom:18px; line-height:1.5;
+  }
+  .rel-eq .big b{color:var(--brick-d)}
+  .metrics{display:flex; flex-direction:column; gap:10px}
+  .metric{display:flex; justify-content:space-between; align-items:baseline; padding:11px 14px; background:#fafaf7; border:1px solid var(--line); border-radius:8px}
+  .metric .mn{font-size:14px; color:var(--ink-soft)}
+  .metric .mn b{color:var(--ink); font-family:"Golos Text",sans-serif}
+  .metric .mv{font-family:"JetBrains Mono",monospace; font-weight:700; font-size:16px; color:var(--steel)}
+  .sigma-row{display:flex; align-items:center; gap:10px; margin-top:16px; font-size:13.5px; color:var(--ink-soft)}
+  .sigma-row input{width:90px; font-family:"JetBrains Mono",monospace; padding:6px 8px; border:1px solid var(--line-strong); border-radius:6px; text-align:center}
+
+  .example{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:24px; box-shadow:var(--shadow)}
+  .example h3{font-family:"Golos Text",sans-serif; font-weight:700; font-size:16px; margin:0 0 14px}
+  .vs{display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:center}
+  .org{border:1px solid var(--line); border-radius:10px; padding:16px; text-align:center}
+  .org.a{border-color:#d9651f}
+  .org.b{border-color:#1f8a5b}
+  .org .nm{font-weight:700; font-size:14px; margin-bottom:8px}
+  .org .ka{font-family:"JetBrains Mono",monospace; font-size:13px; color:var(--ink-faint)}
+  .org .ka b{font-size:22px; color:var(--ink); display:block}
+  .org .lam{font-family:"JetBrains Mono",monospace; font-size:13px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line-strong); color:var(--ink-soft)}
+  .org .lam b{color:var(--steel)}
+  .vsmid{font-family:"Spectral",serif; font-weight:800; color:var(--ink-faint); font-size:20px}
+  .example .concl{margin:16px 0 0; font-size:14px; color:var(--ink-soft)}
+  .example .concl b{color:var(--m5)}
+
+  /* ---------- footer note ---------- */
+  .fnote{background:#fbf3e6; border:1px solid #ecd9b3; border-radius:10px; padding:22px 26px}
+  .fnote h3{font-family:"Golos Text",sans-serif; font-weight:700; font-size:16px; margin:0 0 10px; color:#8a5e0a}
+  .fnote ul{margin:0; padding-left:20px}
+  .fnote li{margin:6px 0; font-size:14px; color:#5f4a1f}
+  .fnote code{font-family:"JetBrains Mono",monospace; background:#f4e6c8; padding:1px 6px; border-radius:4px; font-size:.92em}
+
+  footer.end{padding:34px 0; text-align:center; color:var(--ink-faint); font-size:13px; font-family:"JetBrains Mono",monospace}
+
+  @media(max-width:860px){
+    .calc-grid{grid-template-columns:1fr}
+    .rel-grid{grid-template-columns:1fr}
+    .lscale{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:560px){
+    section{padding:48px 0}
+    .lscale{grid-template-columns:1fr 1fr}
+    .vs{grid-template-columns:1fr; }
+    .vsmid{transform:rotate(90deg)}
+    .ka-val{font-size:46px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">ГОСТ Р &nbsp;·&nbsp; проект, первая редакция</p>
+    <h1>Методика аудита надёжности ЭА: как это работает</h1>
+    <p class="lead">Стандарт превращает результаты аудита процессов в одно число — коэффициент качества аппаратуры <span class="mono">Ка</span>, которым корректируется расчётная надёжность изделия. Ниже — вся логика от опросника до показателей безотказности, с интерактивным калькулятором.</p>
+    <div class="shifr">
+      <span>Шифр ПНС: <b>1.11.165-1.177.26</b></span>
+      <span>САПР электроники</span>
+      <span>Аудит процессов обеспечения надёжности</span>
+    </div>
+  </div>
+</header>
+
+<!-- CORE IDEA -->
+<section>
+  <div class="wrap">
+    <p class="kicker">Суть в двух абзацах</p>
+    <h2>Зачем вообще нужен Ка</h2>
+    <div class="idea">
+      <p>Классический расчёт надёжности берёт справочные интенсивности отказов компонентов (ЭРИ) и складывает их. Но он <b>не видит</b>, насколько хорошо на предприятии устроены процессы: проектирование, входной контроль, технология, испытания. Два завода по одной и той же КД дадут разную реальную надёжность.</p>
+      <p>Методика закрывает этот разрыв. Аудит оценивает процессы по опроснику, ответы сворачиваются в коэффициент <b>Ка</b>, и он домножает справочную сумму интенсивностей: <span class="formula-inline">Λ<sub>ЭА</sub> = Ка · ΣΣ λ<sub>э</sub></span>. Чем зрелее процессы — тем <b>меньше</b> Ка и тем ниже расчётная интенсивность отказов. Ка = 1,0 — условный «стандартный» уровень.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PIPELINE -->
+<section>
+  <div class="wrap">
+    <p class="kicker">Главное · общий конвейер</p>
+    <h2>Путь от вопроса к числу</h2>
+    <p class="sub">Весь стандарт — это одна последовательность преобразований. Текст раскидывает её по 13 разделам; вот она целиком.</p>
+    <div class="pipe">
+      <div class="pstep">
+        <div class="pnum">1</div>
+        <div class="pbody">
+          <h3>Опросник из базы знаний</h3>
+          <p>Вопросы собираются под область аудита, стадию ЖЦ, уровень модуля и роль организации. У каждого вопроса — паспорт: требование, источник, категория отказа, вес, шкала, допустимые свидетельства.</p>
+          <span class="tag">онтологическая модель · паспорт вопроса</span>
+        </div>
+      </div>
+      <div class="pstep">
+        <div class="pnum">2</div>
+        <div class="pbody">
+          <h3>Оценка ответов по шкале L1–L4</h3>
+          <p>Каждый применимый вопрос оценивается от L1 (нет процесса) до L4 (системно, с метриками). Положительная оценка — только при объективных свидетельствах, не «на словах».</p>
+          <span class="tag">G<sub>q</sub> ∈ {0 · ⅓ · ⅔ · 1}</span>
+        </div>
+      </div>
+      <div class="pstep accent">
+        <div class="pnum">3</div>
+        <div class="pbody">
+          <h3>Группировка по 7 категориям причин отказов</h3>
+          <p>Каждый вопрос отнесён к одной основной категории: P, D, M, S, I, N, W. Так аудит превращается из плоского списка в карту уязвимых областей.</p>
+          <span class="tag">P · D · M · S · I · N · W</span>
+        </div>
+      </div>
+      <div class="pstep accent">
+        <div class="pnum">4</div>
+        <div class="pbody">
+          <h3>Нормированная оценка R<sub>i</sub> по категории</h3>
+          <p>Внутри категории ответы сворачиваются с учётом весов: <span class="mono">R<sub>i</sub> = Σ(A·W·G) / Σ(A·W)</span>. Значение от 0 (ничего) до 1 (всё выполнено).</p>
+          <span class="tag">R<sub>i</sub> ∈ [0 … 1]</span>
+        </div>
+      </div>
+      <div class="pstep accent">
+        <div class="pnum">5</div>
+        <div class="pbody">
+          <h3>Частный коэффициент Π<sub>i</sub></h3>
+          <p>R<sub>i</sub> переводится во вклад категории в отказы: <span class="mono">Π<sub>i</sub> = α<sub>i</sub> · [−ln R<sub>i</sub>]<sup>1/β<sub>i</sub></sup></span>. Чем выше R<sub>i</sub>, тем меньше Π<sub>i</sub>.</p>
+          <span class="tag">логарифмическая свёртка</span>
+        </div>
+      </div>
+      <div class="pstep accent">
+        <div class="pnum">6</div>
+        <div class="pbody">
+          <h3>Сборка Ка</h3>
+          <p>Частные коэффициенты складываются в итоговый Ка. Базовая форма — простая сумма; расширенная и частичная учитывают среду, раннюю смертность и рост надёжности.</p>
+          <span class="tag">Ка-Б · Ка-П · Ка-Ч</span>
+        </div>
+      </div>
+      <div class="pstep out">
+        <div class="pnum">7</div>
+        <div class="pbody">
+          <h3>Уровень зрелости + корректировка надёжности</h3>
+          <p>По диапазону Ка определяется уровень зрелости (УЗ 1–5) — для управления и выбора поставщика. Само число Ка идёт в инженерный расчёт: <span class="mono">Λ<sub>ЭА</sub>, MTBF, P(t), T<sub>γ</sub></span>.</p>
+          <span class="tag">УЗ — для людей · Ка — для расчёта</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CATEGORIES -->
+<section>
+  <div class="wrap">
+    <p class="kicker">Шаг 3 крупным планом</p>
+    <h2>Семь категорий причин отказов</h2>
+    <p class="sub">Каждый вопрос аудита висит ровно на одной категории. Они же становятся осями профиля рисков и слагаемыми Ка.</p>
+    <div class="cats" id="cats"></div>
+  </div>
+</section>
+
+<!-- L SCALE -->
+<section>
+  <div class="wrap">
+    <p class="kicker">Шаг 2 крупным планом</p>
+    <h2>Шкала оценки ответов</h2>
+    <p class="sub">Четыре уровня, каждый — конкретное численное значение G<sub>q</sub>. L3 и L4 нельзя ставить без подтверждающих документов.</p>
+    <div class="lscale">
+      <div class="lcard"><div class="lv">L1</div><div class="lg">0</div><p>Требование не выполняется, процесса нет или нет свидетельств</p><div class="ldot" style="background:var(--m1)"></div></div>
+      <div class="lcard"><div class="lv">L2</div><div class="lg">⅓</div><p>Частично: процесс нестабилен, свидетельства выборочные</p><div class="ldot" style="background:var(--m2)"></div></div>
+      <div class="lcard"><div class="lv">L3</div><div class="lg">⅔</div><p>В установленном объёме: есть документы, записи, ответственные</p><div class="ldot" style="background:var(--m4)"></div></div>
+      <div class="lcard"><div class="lv">L4</div><div class="lg">1</div><p>Системно: метрики, прослеживаемость, подтверждённые улучшения</p><div class="ldot" style="background:var(--m5)"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CALCULATOR -->
+<section>
+  <div class="wrap">
+    <p class="kicker">Интерактив · шаги 4–6</p>
+    <h2>Калькулятор Ка</h2>
+    <p class="sub">Покрутите оценку зрелости по каждой категории (это R<sub>i</sub>, в процентах) и смотрите, как меняются вклады Π<sub>i</sub>, итоговый Ка и уровень зрелости. Переключайте форму расчёта.</p>
+    <div class="calc">
+      <div class="calc-grid">
+        <!-- left: sliders -->
+        <div>
+          <h3>Оценка процессов по категориям</h3>
+          <p class="hint">R<sub>i</sub> — насколько выполнены требования категории, от 0 % до 100 %.</p>
+          <div class="sliders" id="sliders"></div>
+        </div>
+        <!-- right: readout -->
+        <div class="readout">
+          <div class="tabs">
+            <div class="tab active" data-form="base">Базовая<span class="t2">Ка-Б</span></div>
+            <div class="tab" data-form="ext">Расширенная<span class="t2">Ка-П</span></div>
+            <div class="tab" data-form="part">Частичная<span class="t2">Ка-Ч</span></div>
+          </div>
+
+          <div class="extra" id="extra">
+            <div class="er"><label>Π<sub>IM</sub> — ранняя смертность <b id="lblIM">1.00</b></label><input type="number" id="pIM" step="0.05" min="0.2" max="3" value="1.00"></div>
+            <div class="er"><label>Π<sub>E</sub> — воздействие среды <b id="lblE">1.00</b></label><input type="number" id="pE" step="0.05" min="0.2" max="3" value="1.00"></div>
+            <div class="er"><label>Π<sub>G</sub> — рост надёжности <b id="lblG">1.00</b></label><input type="number" id="pG" step="0.05" min="0.2" max="3" value="1.00"></div>
+          </div>
+
+          <div class="ka-box">
+            <div class="lbl">Коэффициент качества Ка</div>
+            <div class="ka-val mono" id="kaVal">—</div>
+            <div class="ka-form mono" id="kaForm">базовая форма</div>
+          </div>
+
+          <div class="gauge">
+            <div class="gauge-label">
+              <span class="uz mono" id="uzName">—</span>
+              <span class="uztxt" id="uzTxt"></span>
+            </div>
+            <div class="gbar" id="gbar">
+              <div class="gseg" style="flex:0 0 9.9%;  background:var(--m5)">5</div>
+              <div class="gseg" style="flex:0 0 33.8%; background:var(--m4)">4</div>
+              <div class="gseg" style="flex:0 0 22.4%; background:var(--m3)">3</div>
+              <div class="gseg" style="flex:0 0 29.4%; background:var(--m2)">2</div>
+              <div class="gseg" style="flex:0 0 4.5%;  background:var(--m1)">1</div>
+              <div class="gptr" id="gptr" style="left:0%"></div>
+            </div>
+            <div class="gscale"><span>0,2</span><span>0,3</span><span>1,2</span><span>3</span><span>10</span><span>12+</span></div>
+          </div>
+
+          <details class="params">
+            <summary>Параметры модели (черновые)</summary>
+            <div class="prow">
+              <div class="pcell"><label>α (общий)</label><input type="number" id="pAlpha" step="0.05" min="0.05" max="2" value="0.40"></div>
+              <div class="pcell"><label>β (общий)</label><input type="number" id="pBeta" step="0.1" min="0.3" max="3" value="1.0"></div>
+              <div class="pcell"><label>R<sub>min</sub></label><input type="number" id="pRmin" step="0.01" min="0.005" max="0.2" value="0.02"></div>
+            </div>
+            <p class="note">⚠ Значения α, β и R<sub>min</sub> в текущей редакции Прил. В не заданы — здесь они иллюстративные. Их нужно откалибровать на опорных предприятиях и зафиксировать в стандарте.</p>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RELIABILITY -->
+<section>
+  <div class="wrap">
+    <p class="kicker">Шаг 7 · раздел 11</p>
+    <h2>От Ка к показателям безотказности</h2>
+    <p class="sub">Полученный Ка домножает справочную сумму интенсивностей отказов. Метрики ниже пересчитываются от текущего Ка из калькулятора.</p>
+    <div class="rel-grid">
+      <div class="rel-eq">
+        <div class="big">Λ<sub>ЭА</sub> = <b id="kaEcho">Ка</b> · ΣΣ λ<sub>эij</sub></div>
+        <div class="metrics">
+          <div class="metric"><span class="mn"><b>Λ<sub>ЭА</sub></b> · интенсивность отказов</span><span class="mv" id="mLam">—</span></div>
+          <div class="metric"><span class="mn"><b>MTBF</b> · средняя наработка</span><span class="mv" id="mMtbf">—</span></div>
+          <div class="metric"><span class="mn"><b>P(t)</b> · безотк. работа за 1 год</span><span class="mv" id="mPt">—</span></div>
+          <div class="metric"><span class="mn"><b>T<sub>γ</sub></b> · гамма-наработка, γ=90 %</span><span class="mv" id="mTg">—</span></div>
+        </div>
+        <div class="sigma-row">
+          ΣΣ λ<sub>эij</sub> =
+          <input type="number" id="sigma" step="0.1" min="0.1" value="2.0">
+          · 10⁻⁶ 1/ч
+        </div>
+      </div>
+
+      <div class="example">
+        <h3>Пример из Прил. Е: выбор изготовителя</h3>
+        <p class="sub" style="margin-bottom:16px; font-size:14px">Два завода, одна КД, одинаковая Σλ = 2,0·10⁻⁶ 1/ч. Решает качество процессов.</p>
+        <div class="vs">
+          <div class="org a">
+            <div class="nm">Организация А</div>
+            <div class="ka">Ка = <b>1,5</b> УЗ 3</div>
+            <div class="lam">Λ = <b>3,0·10⁻⁶</b> 1/ч</div>
+          </div>
+          <div class="vsmid">→</div>
+          <div class="org b">
+            <div class="nm">Организация Б</div>
+            <div class="ka">Ка = <b>0,7</b> УЗ 4</div>
+            <div class="lam">Λ = <b>1,4·10⁻⁶</b> 1/ч</div>
+          </div>
+        </div>
+        <p class="concl">При прочих равных у организации Б расчётная интенсивность отказов <b>в 2,1 раза ниже</b> — Ка работает как метрика качества процессов при выборе поставщика.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER NOTE -->
+<section style="border-bottom:none">
+  <div class="wrap">
+    <div class="fnote">
+      <h3>Что в черновике ещё не закрыто (полезно для редакции)</h3>
+      <ul>
+        <li>Приложение В обещает значения <code>α<sub>i</sub></code>, <code>β<sub>i</sub></code> по категориям, но не приводит их — в калькуляторе стоят иллюстративные.</li>
+        <li>Не задано минимальное расчётное значение <code>R<sub>min</sub></code> (п. 9.8.8) — без него <code>−ln(0)</code> уходит в бесконечность.</li>
+        <li>Множители <code>Π<sub>IM</sub></code>, <code>Π<sub>E</sub></code>, <code>Π<sub>G</sub></code> для расширенной/частичной формы не определены численно.</li>
+        <li>Нижняя граница шкалы Ка = 0,2 рекомендована, но при <code>R<sub>i</sub>=1</code> формула даёт Ка = 0 — стоит описать, как стыкуются «пол» и формула.</li>
+        <li>В п. 12.3.1 и 12.4.1 ссылки на «9.1.3» и «9.3» — кажется, опечатки (атрибуты паспорта в 9.2.4, варианты расчёта в 9.10).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer class="end">
+  Интерактивный разбор методики · параметры расчёта черновые · сверяйте с текстом проекта ГОСТ Р
+</footer>
+
+<script>
+const CATS = [
+  {k:'P', c:'#a32c1e', name:'Отказы комплектующих', d:'ЭРИ, материалы, поставщики, входной контроль, прослеживаемость компонентов', r:0.85},
+  {k:'D', c:'#23527c', name:'Конструктивные и проектные', d:'Требования, схемотехника, конструкция, моделирование, проектная верификация', r:0.70},
+  {k:'M', c:'#c98a12', name:'Производственные и технологические', d:'Техпроцессы, сборка, монтаж, контроль, ремонт, производство', r:0.60},
+  {k:'S', c:'#5b3a8c', name:'Системно-организационные', d:'Управление процессами, СМК, ответственность, конфигурация, документация', r:0.55},
+  {k:'I', c:'#1f8a5b', name:'Индуцированные эксплуатационные', d:'Условия эксплуатации, ошибки применения, обслуживание, человеческий фактор', r:0.78},
+  {k:'N', c:'#0e7c86', name:'Недостатки контроля и диагностики', d:'Испытания, контроль, диагностика, контролепригодность, неподтв. дефекты', r:0.66},
+  {k:'W', c:'#7a4a1f', name:'Деградационные и износные', d:'Старение, износ, ресурс, хранение, окончание срока службы', r:0.62},
+];
+
+const state = {form:'base', alpha:0.40, beta:1.0, rmin:0.02, pIM:1.0, pE:1.0, pG:1.0, sigma:2.0};
+const ri = {}; CATS.forEach(c=>ri[c.k]=c.r);
+
+// build category cards
+const catsEl = document.getElementById('cats');
+CATS.forEach(c=>{
+  const el = document.createElement('div');
+  el.className='cat'; el.style.setProperty('--bar', c.c);
+  el.innerHTML = `<div class="cbadge" style="background:${c.c}">${c.k}</div>
+    <h3>${c.name}</h3><p>${c.d}</p>`;
+  catsEl.appendChild(el);
+});
+
+// build sliders
+const slEl = document.getElementById('sliders');
+CATS.forEach(c=>{
+  const row = document.createElement('div');
+  row.className='srow';
+  row.innerHTML = `
+    <div class="schip" style="background:${c.c}">${c.k}</div>
+    <div class="strack">
+      <div class="sname">${c.name}</div>
+      <input type="range" min="0" max="100" value="${Math.round(c.r*100)}" data-k="${c.k}" style="--chip:${c.c}">
+    </div>
+    <div class="sval"><span id="rv-${c.k}">${Math.round(c.r*100)}%</span><span class="pi" id="pi-${c.k}">Π —</span></div>`;
+  slEl.appendChild(row);
+});
+
+function pi(rkey){
+  const R = Math.max(ri[rkey], state.rmin);
+  return state.alpha * Math.pow(-Math.log(R), 1/state.beta);
+}
+function maxPi(){
+  return state.alpha * Math.pow(-Math.log(state.rmin), 1/state.beta);
+}
+
+function computeKa(P){
+  // P is object of Π per category
+  if(state.form==='ext'){
+    return P.P*state.pIM*state.pE + P.D*state.pG + P.M*state.pIM*state.pE*state.pG
+         + P.S*state.pG + P.I + P.N + P.W;
+  }
+  if(state.form==='part'){
+    return P.P + P.D*state.pG + P.M*state.pG + P.S*state.pG + P.I + P.N + P.W;
+  }
+  return P.P+P.D+P.M+P.S+P.I+P.N+P.W;
+}
+
+function uzFor(ka){
+  if(ka<=0.3) return {n:5, t:'высший уровень', c:'var(--m5)'};
+  if(ka<=1.2) return {n:4, t:'высокий уровень', c:'var(--m4)'};
+  if(ka<=3)   return {n:3, t:'стандартный уровень', c:'var(--m3)'};
+  if(ka<=10)  return {n:2, t:'низкий уровень', c:'var(--m2)'};
+  return {n:1, t:'минимальный уровень', c:'var(--m1)'};
+}
+
+const LO=Math.log(0.2), HI=Math.log(12), SPAN=HI-LO;
+function ptrPos(ka){
+  let x=(Math.log(Math.max(ka,0.05))-LO)/SPAN*100;
+  return Math.max(0, Math.min(100, x));
+}
+
+function fmtLam(v){ // v in 1/h
+  const e = v*1e6;
+  return e.toFixed(2)+'·10⁻⁶';
+}
+function fmtHours(h){
+  if(h>=1e6) return (h/1e6).toFixed(2)+'·10⁶ ч';
+  if(h>=1000) return Math.round(h).toLocaleString('ru-RU')+' ч';
+  return h.toFixed(0)+' ч';
+}
+
+function render(){
+  // Π per cat + bars
+  const P={};
+  const mp = maxPi();
+  CATS.forEach(c=>{
+    P[c.k]=pi(c.k);
+    document.getElementById('rv-'+c.k).textContent = Math.round(ri[c.k]*100)+'%';
+    document.getElementById('pi-'+c.k).textContent = 'Π '+P[c.k].toFixed(2);
+  });
+
+  const ka = computeKa(P);
+  document.getElementById('kaVal').textContent = ka.toFixed(2).replace('.',',');
+  const fname = state.form==='ext'?'расширенная форма Ка-П':state.form==='part'?'частичная форма Ка-Ч':'базовая форма Ка-Б';
+  document.getElementById('kaForm').textContent = fname;
+
+  const uz = uzFor(ka);
+  document.getElementById('uzName').textContent = 'УЗ '+uz.n;
+  document.getElementById('uzName').style.color = uz.c;
+  document.getElementById('uzTxt').textContent = uz.t;
+  document.getElementById('gptr').style.left = ptrPos(ka)+'%';
+
+  // reliability
+  document.getElementById('kaEcho').textContent = ka.toFixed(2).replace('.',',');
+  const lam = ka * state.sigma * 1e-6; // 1/h
+  const mtbf = 1/lam;
+  const t = 8760;
+  const pt = Math.exp(-lam*t);
+  const tg = -Math.log(0.9)/lam;
+  document.getElementById('mLam').textContent = fmtLam(lam)+' 1/ч';
+  document.getElementById('mMtbf').textContent = fmtHours(mtbf);
+  document.getElementById('mPt').textContent = (pt*100).toFixed(2).replace('.',',')+' %';
+  document.getElementById('mTg').textContent = fmtHours(tg);
+}
+
+// events: sliders
+slEl.querySelectorAll('input[type=range]').forEach(inp=>{
+  inp.addEventListener('input', e=>{
+    ri[e.target.dataset.k] = (+e.target.value)/100;
+    render();
+  });
+});
+// tabs
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    state.form = t.dataset.form;
+    document.getElementById('extra').classList.toggle('show', state.form!=='base');
+    render();
+  });
+});
+// extra multipliers
+const bind=(id,key,lbl)=>{
+  const el=document.getElementById(id);
+  el.addEventListener('input',()=>{
+    state[key]=+el.value||1;
+    if(lbl) document.getElementById(lbl).textContent=(+el.value||1).toFixed(2);
+    render();
+  });
+};
+bind('pIM','pIM','lblIM'); bind('pE','pE','lblE'); bind('pG','pG','lblG');
+// params
+bind('pAlpha','alpha'); bind('pBeta','beta'); bind('pRmin','rmin');
+// sigma
+document.getElementById('sigma').addEventListener('input',e=>{ state.sigma=+e.target.value||0; render(); });
+
+render();
+</script>
+</body>
+</html>
